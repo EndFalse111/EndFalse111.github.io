@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贴膜机</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 0 10px;
+        }
+        .upload-section {
+            margin-bottom: 20px;
+        }
+        .batch-upload {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .upload-box {
+            position: relative;
+            flex: 1;
+            min-width: 140px;
+        }
+        .upload-box input[type="file"] {
+            display: none;
+        }
+        .upload-box label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 20px;
+        }
+        .preview-item {
+            width: 100%;
+            aspect-ratio: 1;
+            position: relative;
+            cursor: pointer;
+        }
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 2px solid transparent;
+        }
+        .preview-item.active img {
+            border-color: #4CAF50;
+        }
+        .button-section {
+            margin: 20px 0;
+        }
+        .tool-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .face-cleaning-progress {
+            width: 100%;
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-container {
+            width: 100%;
+            background: #f0f0f0;
+            border-radius: 5px;
+            padding: 5px;
+        }
+        .progress-bar {
+            height: 20px;
+            background: #4CAF50;
+            width: 0;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        .film-eraser-controls {
+            margin-top: 10px;
+            display: none;
+        }
+        .eraser-control-item {
+            margin: 10px 0;
+        }
+        .watermark-opacity-popup {
+            position: absolute;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1000;
+            border: 1px solid #ddd;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 200px;
+        }
+        .slider-container input[type="range"] {
+            flex: 1;
+            width: 100%;
+        }
+        .slider-container span {
+            min-width: 50px;
+            text-align: right;
+        }
+        .export-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .export-modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            min-width: 300px;
+            max-width: 90%;
+            margin: 20px;
+            text-align: center;
+        }
+        .export-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .export-options button {
+            padding: 12px 20px;
+            font-size: 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .export-options button:hover {
+            background: #45a049;
+        }
+        .close-btn {
+            margin-top: 10px;
+            background: #666;
+        }
+        @media (max-width: 768px) {
+            .preview-item {
+                width: calc(50% - 5px);
+            }
+            .tool-buttons {
+                justify-content: center;
+            }
+            button {
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+            #batchPreviewCanvas {
+                width: 100%;
+                height: auto;
+            }
+        }
+        @media (max-width: 480px) {
+            .preview-item {
+                width: calc(33.33% - 7px);
+            }
+            .batch-upload {
+                flex-direction: column;
+            }
+            .upload-box {
+                width: 100%;
+            }
+        }
+        .export-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1001;
+        }
+        .export-loading-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="upload-section">
+            <div class="batch-upload">
+                <div class="upload-box">
+                    <input type="file" id="batchBackgroundInput" accept="image/*" multiple />
+                    <label for="batchBackgroundInput">批量上传底图</label>
+                </div>
+                <div class="upload-box">
+                    <input type="file" id="filmWatermarkInput" accept="image/*" />
+                    <label for="filmWatermarkInput">上传水印</label>
+                </div>
+            </div>
+            <div class="preview-grid" id="batchPreviewGrid">
+                <!-- 预览图片将在这里动态显示 -->
+            </div>
+        </div>
+
+        <div class="button-section">
+            <div class="tool-buttons">
+                <button id="filmEffectBtn" disabled>效果</button>
+                <button id="watermarkOpacityBtn" disabled>水印透明度</button>
+                <button id="batchExportBtn" disabled>批量导出</button>
+            </div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="face-cleaning-progress">
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+                <div class="progress-text">擦脸进度: <span class="progress-percentage">0%</span></div>
+            </div>
+        </div>
+
+        <div class="preview-controls">
+            <button id="prevPreview" class="preview-nav-btn" disabled>←</button>
+            <span id="previewCounter">0/0</span>
+            <button id="nextPreview" class="preview-nav-btn" disabled>→</button>
+        </div>
+        
+        <canvas id="batchPreviewCanvas"></canvas>
+
+        <div class="watermark-opacity-popup">
+            <div class="slider-container">
+                <label for="watermark-opacity-slider">透明度:</label>
+                <input type="range" id="watermark-opacity-slider" min="0" max="100" value="100">
+                <span id="watermark-opacity-value">100%</span>
+            </div>
+        </div>
+
+        <div class="export-modal" id="exportModal" style="display: none;">
+            <div class="export-modal-content">
+                <h3>选择导出方式</h3>
+                <div class="export-options">
+                    <button id="zipExportBtn">ZIP压缩包导出</button>
+                    <button id="separateExportBtn">单独图片导出</button>
+                </div>
+                <button class="close-btn" id="closeExportBtn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="export-loading" id="exportLoading">
+        <div class="export-loading-content">
+            <h3>正在处理...</h3>
+            <p>请稍候，正在处理您的图片</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        class FilmMachine {
+            constructor() {
+                // 初始化画布和上下文
+                this.canvas = document.getElementById('batchPreviewCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                // 初始化属性
+                this.backgroundImages = [];
+                this.watermarkImage = null;
+                this.currentPreviewIndex = 0;
+                this.watermarkOpacity = 1.0;
+                
+                // 获取DOM元素
+                this.initializeElements();
+                
+                // 绑定事件
+                this.bindEvents();
+                
+                // 加载人脸检测模型
+                this.loadFaceDetectionModel();
+            }
+            
+            initializeElements() {
+                // 获取所有需要的DOM元素
+                this.prevPreviewBtn = document.getElementById('prevPreview');
+                this.nextPreviewBtn = document.getElementById('nextPreview');
+                this.previewCounter = document.getElementById('previewCounter');
+                this.filmEffectBtn = document.getElementById('filmEffectBtn');
+                this.watermarkOpacityBtn = document.getElementById('watermarkOpacityBtn');
+                this.watermarkOpacityPopup = document.querySelector('.watermark-opacity-popup');
+                this.watermarkOpacitySlider = document.getElementById('watermark-opacity-slider');
+                this.watermarkOpacityValue = document.getElementById('watermark-opacity-value');
+                this.batchExportBtn = document.getElementById('batchExportBtn');
+            }
+
+            bindEvents() {
+                // 文件上传事件
+                document.getElementById('batchBackgroundInput').addEventListener('change', 
+                    (e) => this.handleBackgroundUpload(e.target.files));
+                
+                document.getElementById('filmWatermarkInput').addEventListener('change', 
+                    (e) => this.handleWatermarkUpload(e.target.files[0]));
+                
+                // 导航按钮事件
+                if (this.prevPreviewBtn) {
+                    this.prevPreviewBtn.addEventListener('click', () => this.navigatePreview(-1));
+                }
+                if (this.nextPreviewBtn) {
+                    this.nextPreviewBtn.addEventListener('click', () => this.navigatePreview(1));
+                }
+                
+                // 导出按钮
+                if (this.batchExportBtn) {
+                    this.batchExportBtn.addEventListener('click', () => this.exportImages());
+                }
+                
+                // 效果按钮事件
+                if (this.filmEffectBtn) {
+                    this.filmEffectBtn.addEventListener('click', () => this.applyEffect());
+                }
+                
+                // 水印透明度控制
+                if (this.watermarkOpacityBtn) {
+                    this.watermarkOpacityBtn.addEventListener('click', () => this.toggleOpacityControl());
+                }
+                
+                if (this.watermarkOpacitySlider) {
+                    this.watermarkOpacitySlider.addEventListener('input', (e) => {
+                        this.watermarkOpacity = e.target.value / 100;
+                        this.watermarkOpacityValue.textContent = `${e.target.value}%`;
+                        this.updatePreview();
+                    });
+                }
+                
+                // 导出相关按钮事件
+                document.getElementById('zipExportBtn').addEventListener('click', () => {
+                    this.exportAsZip();
+                });
+                
+                document.getElementById('separateExportBtn').addEventListener('click', () => {
+                    this.exportAsSeparateImages();
+                });
+                
+                document.getElementById('closeExportBtn').addEventListener('click', () => {
+                    document.getElementById('exportModal').style.display = 'none';
+                });
+                
+                // 点击模态框外部关闭
+                document.getElementById('exportModal').addEventListener('click', (e) => {
+                    if (e.target === document.getElementById('exportModal')) {
+                        e.target.style.display = 'none';
+                    }
+                });
+            }
+
+            // 处理背景图片上传
+            handleBackgroundUpload(files) {
+                if (!files || files.length === 0) return;
+                
+                const promises = Array.from(files).map(file => {
+                    return new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onload = e => {
+                            const img = new Image();
+                            img.onload = () => {
+                                // 创建缩略图 - 使用更小的尺寸
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                const maxSize = 80; // 减小预览图尺寸
+                                const scale = Math.min(maxSize / img.width, maxSize / img.height);
+                                canvas.width = img.width * scale;
+                                canvas.height = img.height * scale;
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                
+                                resolve({
+                                    image: img,
+                                    thumbnail: canvas.toDataURL('image/jpeg', 0.7) // 使用 JPEG 格式和较低质量
+                                });
+                            };
+                            img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                });
+                
+                Promise.all(promises).then(images => {
+                    this.backgroundImages.push(...images);
+                    this.updatePreviewGrid();
+                    this.updateControls();
+                    this.currentPreviewIndex = this.backgroundImages.length - 1;
+                    this.updatePreview();
+                });
+            }
+
+            // 处理水印图片上传
+            handleWatermarkUpload(file) {
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.watermarkImage = img;
+                        
+                        // 为所有图片创建水印层
+                        this.backgroundImages.forEach(item => {
+                            const watermarkCanvas = document.createElement('canvas');
+                            watermarkCanvas.width = item.image.width;
+                            watermarkCanvas.height = item.image.height;
+                            const watermarkCtx = watermarkCanvas.getContext('2d');
+                            watermarkCtx.drawImage(this.watermarkImage, 0, 0, item.image.width, item.image.height);
+                            item.watermarkLayer = watermarkCanvas;
+                        });
+                        
+                        this.updateControls();
+                        this.updatePreview();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            // 更新预览网格
+            updatePreviewGrid() {
+                const grid = document.getElementById('batchPreviewGrid');
+                grid.innerHTML = '';
+                
+                this.backgroundImages.forEach((item, index) => {
+                    grid.insertAdjacentHTML('beforeend', `
+                        <div class="preview-item ${index === this.currentPreviewIndex ? 'active' : ''}" 
+                             onclick="filmMachine.selectImage(${index})">
+                            <img src="${item.thumbnail}" alt="预览图 ${index + 1}">
+                        </div>
+                    `);
+                });
+            }
+
+            // 更新控制按钮状态
+            updateControls() {
+                const hasImages = this.backgroundImages.length > 0;
+                const hasWatermark = this.watermarkImage !== null;
+                
+                this.filmEffectBtn.disabled = !(hasImages && hasWatermark);
+                this.watermarkOpacityBtn.disabled = !(hasImages && hasWatermark);
+                this.batchExportBtn.disabled = !(hasImages && hasWatermark);
+                
+                if (this.prevPreviewBtn) {
+                    this.prevPreviewBtn.disabled = this.currentPreviewIndex === 0;
+                }
+                if (this.nextPreviewBtn) {
+                    this.nextPreviewBtn.disabled = this.currentPreviewIndex >= this.backgroundImages.length - 1;
+                }
+                
+                if (this.previewCounter) {
+                    this.previewCounter.textContent = `${this.currentPreviewIndex + 1} / ${this.backgroundImages.length}`;
+                }
+            }
+
+            // 更新预览画布
+            updatePreview() {
+                const currentItem = this.backgroundImages[this.currentPreviewIndex];
+                if (!currentItem) return;
+                
+                this.canvas.width = currentItem.image.width;
+                this.canvas.height = currentItem.image.height;
+                
+                // 清除画布
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                if (currentItem.processedImage) {
+                    // 如果有处理后的图片，显示处理后的效果
+                    this.ctx.drawImage(currentItem.processedImage, 0, 0);
+                } else {
+                    // 否则显示原始图片和水印
+                    this.ctx.drawImage(currentItem.image, 0, 0);
+                    
+                    if (currentItem.watermarkLayer) {
+                        this.ctx.globalAlpha = this.watermarkOpacity;
+                        this.ctx.drawImage(currentItem.watermarkLayer, 0, 0);
+                        this.ctx.globalAlpha = 1.0;
+                    }
+                }
+                
+                this.updateControls();
+            }
+
+            // 导出图片
+            async exportImages() {
+                document.getElementById('exportModal').style.display = 'flex';
+            }
+
+            async exportAsZip() {
+                try {
+                    document.getElementById('exportLoading').style.display = 'flex';
+                    const zip = new JSZip();
+                    
+                    for (let i = 0; i < this.backgroundImages.length; i++) {
+                        const currentItem = this.backgroundImages[i];
+                        const canvas = document.createElement('canvas');
+                        canvas.width = currentItem.image.width;
+                        canvas.height = currentItem.image.height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        ctx.drawImage(currentItem.image, 0, 0);
+                        if (currentItem.watermarkLayer) {
+                            ctx.globalAlpha = this.watermarkOpacity;
+                            ctx.drawImage(currentItem.watermarkLayer, 0, 0);
+                            ctx.globalAlpha = 1.0;
+                        }
+                        
+                        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+                        zip.file(`watermark_${i + 1}.png`, blob);
+                    }
+                    
+                    const content = await zip.generateAsync({
+                        type: 'blob',
+                        compression: 'STORE'
+                    });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = 'watermarks.zip';
+                    link.click();
+                    
+                    document.getElementById('exportModal').style.display = 'none';
+                } catch (error) {
+                    console.error('ZIP导出失败:', error);
+                    alert('ZIP导出失败，请重试');
+                } finally {
+                    document.getElementById('exportLoading').style.display = 'none';
+                }
+            }
+
+            async exportAsSeparateImages() {
+                document.getElementById('exportLoading').style.display = 'flex';
+                try {
+                    for (let i = 0; i < this.backgroundImages.length; i++) {
+                        const currentItem = this.backgroundImages[i];
+                        
+                        const exportCanvas = document.createElement('canvas');
+                        exportCanvas.width = currentItem.image.width;
+                        exportCanvas.height = currentItem.image.height;
+                        const ctx = exportCanvas.getContext('2d');
+                        
+                        ctx.drawImage(currentItem.image, 0, 0);
+                        
+                        if (currentItem.watermarkLayer) {
+                            ctx.globalAlpha = this.watermarkOpacity;
+                            ctx.drawImage(currentItem.watermarkLayer, 0, 0);
+                            ctx.globalAlpha = 1.0;
+                        }
+                        
+                        const link = document.createElement('a');
+                        link.download = `watermark_${i + 1}.png`;
+                        link.href = exportCanvas.toDataURL('image/png', 1.0);
+                        link.click();
+                        
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                } catch (error) {
+                    console.error('导出失败:', error);
+                    alert('导出失败，请重试');
+                } finally {
+                    document.getElementById('exportModal').style.display = 'none';
+                    document.getElementById('exportLoading').style.display = 'none';
+                }
+            }
+
+            // 导航预览
+            navigatePreview(direction) {
+                const newIndex = this.currentPreviewIndex + direction;
+                if (newIndex >= 0 && newIndex < this.backgroundImages.length) {
+                    this.currentPreviewIndex = newIndex;
+                    this.updatePreview();
+                }
+            }
+
+            // 切换透明度控制面板
+            toggleOpacityControl() {
+                const isVisible = this.watermarkOpacityPopup.style.display === 'block';
+                this.watermarkOpacityPopup.style.display = isVisible ? 'none' : 'block';
+                
+                if (!isVisible) {
+                    const buttonRect = this.watermarkOpacityBtn.getBoundingClientRect();
+                    this.watermarkOpacityPopup.style.left = `${buttonRect.left}px`;
+                    this.watermarkOpacityPopup.style.top = `${buttonRect.bottom + 10}px`;
+                }
+            }
+            
+            // 应用效果
+            applyEffect() {
+                if (!this.backgroundImages.length || !this.watermarkImage) return;
+                
+                // 对所有图片应用效果
+                this.backgroundImages.forEach((item, index) => {
+                    // 如果没有水印层，创建一个新的
+                    if (!item.watermarkLayer) {
+                        const watermarkCanvas = document.createElement('canvas');
+                        watermarkCanvas.width = item.image.width;
+                        watermarkCanvas.height = item.image.height;
+                        const watermarkCtx = watermarkCanvas.getContext('2d');
+                        watermarkCtx.drawImage(this.watermarkImage, 0, 0, item.image.width, item.image.height);
+                        item.watermarkLayer = watermarkCanvas;
+                    }
+                    
+                    // 创建效果画布
+                    const effectCanvas = document.createElement('canvas');
+                    effectCanvas.width = item.image.width;
+                    effectCanvas.height = item.image.height;
+                    const effectCtx = effectCanvas.getContext('2d');
+                    
+                    // 绘制底图
+                    effectCtx.drawImage(item.image, 0, 0);
+                    
+                    // 应用叠加效果
+                    effectCtx.globalCompositeOperation = 'overlay';
+                    effectCtx.globalAlpha = this.watermarkOpacity;
+                    effectCtx.drawImage(item.watermarkLayer, 0, 0);
+                    
+                    // 重置绘制设置
+                    effectCtx.globalCompositeOperation = 'source-over';
+                    effectCtx.globalAlpha = 1.0;
+                    
+                    // 保存效果结果
+                    item.processedImage = effectCanvas;
+                });
+                
+                // 更新当前预览
+                this.updatePreview();
+            }
+
+            // 添加图片选择方法
+            selectImage(index) {
+                this.currentPreviewIndex = index;
+                document.querySelectorAll('.preview-item').forEach((item, i) => {
+                    item.classList.toggle('active', i === index);
+                });
+                this.updatePreview();
+            }
+        }
+        
+        // 创建实例
+        const filmMachine = new FilmMachine();
+    </script>
+</body>
+</html> 
